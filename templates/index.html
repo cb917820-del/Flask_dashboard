@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Folder Analysis App</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            padding: 20px;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        select, button, input[type=file] {
+            width: 100%;
+            margin-top: 6px;
+            margin-bottom: 12px;
+            padding: 6px;
+        }
+
+        button {
+            background: #2b7cff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1e5edc;
+        }
+
+        .status {
+            margin-top: 15px;
+            font-weight: bold;
+            color: green;
+        }
+
+        .main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .plot-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .plot-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        img {
+            max-width: 95%;
+            border: 1px solid #ccc;
+            background: white;
+        }
+
+        .plot-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #stats-panel {
+            width: 40%;
+            padding: 20px;
+            border: 1px solid #ccc;
+            background: #fafafa;
+            display: none;
+        }
+
+        #stats-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        area {
+            cursor: pointer;
+        }
+
+        .map-image {
+            width: auto;
+            height: auto;
+            max-width: none;
+            display: block;
+        }
+    </style>
+
+    <script src="https://unpkg.com/image-map-resizer/dist/imageMapResizer.min.js"></script>
+
+    <script>
+        function toggleKPI(selectElement, targetId) {
+            const selected = selectElement.value;
+            const dropdown = document.getElementById(targetId);
+            dropdown.style.display = (selected === "KPI") ? "block" : "none";
+        }
+
+        function loadRegionStats(regionName) {
+            fetch(`/region/${regionName}`)
+                .then(response => response.json())
+                .then(data => {
+                    const panel = document.getElementById("stats-panel");
+                    const table = document.getElementById("stats-table");
+                    const title = document.getElementById("stats-title");
+
+                    title.textContent = regionName + " – Region Statistics";
+                    table.innerHTML = "";
+
+                    for (const [key, value] of Object.entries(data)) {
+                        const row = document.createElement("tr");
+
+                        const safeValue = Number.isFinite(value) ? value.toFixed(1) : "0";
+
+                        row.innerHTML = `
+                            <td>${key.replace(/_/g, " ")}</td>
+                            <td>${safeValue}</td>
+                        `;
+
+                        table.appendChild(row);
+                    }
+
+                    panel.style.display = "block";
+                });
+        }
+
+        window.onload = function() {
+            if (typeof imageMapResize === "function") {
+                imageMapResize();
+            }
+        };
+    </script>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="sidebar">
+
+        <h2>Folder Analysis</h2>
+
+        <form method="POST" action="/" enctype="multipart/form-data">
+            <label>Select Region Excel Files</label>
+            <input type="file" name="region_files" multiple>
+            <input type="hidden" name="action" value="upload_region">
+            <button type="submit">Load Region Files</button>
+        </form>
+
+        {% if region_files %}
+        <label>Select Region Excel File</label>
+
+        <form method="POST" action="/">
+            <select name="selected_file">
+                {% for f in region_files %}
+                    <option value="{{ f }}">{{ f }}</option>
+                {% endfor %}
+            </select>
+
+            <input type="hidden" name="source" value="region">
+
+            <label>Analysis Type</label>
+            <select name="analysis" onchange="toggleKPI(this, 'kpi_region_dropdown')">
+                <option value="KPI">Key performance indicator</option>
+                <option value="Frequency">Frequency of participation</option>
+                <option value="ParticipationSetting">Participation in last year by setting</option>
+                <option value="DisabilitySupport">Support for those with disability</option>
+                <option value="Demand">Demand</option>
+                <option value="Motivation">Motivation attitude membership and volunteering</option>
+                <option value="School">School Provision statistics</option>
+            </select>
+
+            <div id="kpi_region_dropdown" style="display:block;">
+                <label>KPI Category</label>
+                <select name="kpi_category">
+                    <option value="Gender">Gender</option>
+                    <option value="Yeargroup">Year Group</option>
+                    <option value="Ethnicity">Ethnicity</option>
+                    <option value="Disabilityorimpairment">Disability or Impairment</option>
+                    <option value="Learningdifficulty">Learning Difficulty</option>
+                    <option value="FreeSchoolMealquartile">FSM Quartile</option>
+                    <option value="Welshspeaker">Welsh Speaker</option>
+                </select>
+            </div>
+
+            <button type="submit" name="action" value="analyze">Run Region Analysis</button>
+        </form>
+        {% endif %}
+
+        <hr>
+
+        <form method="POST" action="/" enctype="multipart/form-data">
+            <label>Select Comparative Excel Files</label>
+            <input type="file" name="compare_files" multiple>
+            <input type="hidden" name="action" value="upload_compare">
+            <button type="submit">Load Comparative Files</button>
+        </form>
+
+        {% if compare_files %}
+        <label>Select Comparative Excel File</label>
+
+        <form method="POST" action="/">
+            <select name="selected_file">
+                {% for f in compare_files %}
+                    <option value="{{ f }}">{{ f }}</option>
+                {% endfor %}
+            </select>
+
+            <input type="hidden" name="source" value="compare">
+
+            <label>Analysis Type</label>
+            <select name="analysis">
+                <option value="Overall">Overall</option>
+            </select>
+
+            <button type="submit" name="action" value="analyze">Run Comparative Analysis</button>
+        </form>
+        {% endif %}
+
+        {% if message %}
+            <div class="status">{{ message }}</div>
+        {% endif %}
+
+    </div>
+
+    <div class="main">
+        {% if plot_file or plot_file2 %}
+            <div class="plot-container">
+
+                {% if plot_file %}
+                    {% if plot_file is iterable and plot_file is not string %}
+                        {% for img in plot_file %}
+                            <div>
+                                <div class="plot-title">Plot {{ loop.index }}</div>
+                                <img src="{{ img }}" class="plot-image">
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="display:flex; gap:20px; width:100%; align-items:flex-start;">
+
+                            <div style="width:55%;">
+                                <div class="plot-title">Plot 1</div>
+
+                                <img src="{{ plot_file }}"
+                                     usemap="#walesmap"
+                                     class="map-image">
+
+                                <map name="walesmap" id="walesmap">
+
+                                    <area shape="rect" coords="60,70,115,90"
+                                          href="#"
+                                          onclick="event.preventDefault(); loadRegionStats('Pembrokeshire_eng')">
+
+                                    <area shape="rect" coords="200,65,260,95"
+                                          href="#"
+                                          onclick="event.preventDefault(); loadRegionStats('Carmarthenshire_eng')">
+
+                                    <area shape="rect" coords="230,160,260,180"
+                                          href="#"
+                                          onclick="event.preventDefault(); loadRegionStats('Swansea_eng')">
+
+                                    <area shape="rect" coords="285,130,345,170"
+                                          href="#"
+                                          onclick="event.preventDefault(); loadRegionStats('Neath_Port_Talbot_eng')">
+
+                                </map>
+                            </div>
+
+                            <div id="stats-panel">
+                                <h2 id="stats-title">Region Statistics</h2>
+                                <table id="stats-table" style="width:100%; border-collapse:collapse;"></table>
+                            </div>
+
+                        </div>
+
+                    {% endif %}
+                {% endif %}
+
+                {% if plot_file2 %}
+                    <div>
+                        <div class="plot-title">Plot 2</div>
+                        <img src="{{ plot_file2 }}" class="plot-image">
+                    </div>
+                {% endif %}
+
+            </div>
+        {% else %}
+            <p>No analysis run yet</p>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>
